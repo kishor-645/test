@@ -1,0 +1,48 @@
+Scripts		
+scan_image.pyOLD	old script for twist lock vulnerability scanning.now its not getting used by any pipeline	
+scan.py	the script is using for twist lock vulnerability scanning in main azure-pipelines.yml	sudo python scripts/scan.py --image_name $(imageRepository) --acr $(dockerRegistryName) --tag latest --twistcli_url "https://us-east1.cloud.twistlock.com/us-2-158286547" --accesskey $twistaccesskey --secretkey $twistsecretkey
+.dockerignore	no where using	
+.gitignore	no where using	
+azure-pipelines.yml	this is the main pipeline which is building base and sub images and scanning with twist lock and getting pushed into common repos on AWS and AZURE	
+README.MD	it is providing the info about the above pipeline overall contribution	
+testscripts		
+test_long_var_with_contenv.sh	this is script is using on goss.yaml from test scripts folder for testing the container on run time	time dgoss run -v `pwd`/test_scripts:/test_scripts -e TEST_LONG_VAR="${largevar}" -e 1VAR_NAME=varnameStartWithNumber -e var.name=varnameHasPeriod -e var-name=varnameHasHyphen runtimetestimage || ((i++))
+test_long_var_without_contenv.sh	this script is using on test.sh and goss.yaml for container tests and run time test	
+azure-pipelines.yml	with this pipeline building the main base image for ubuntu and pushing itto repos using some security file	
+docker-compose.yml	did not understand why they are using this getting handled something inthis need to understand what is the use	
+Dockerfile	This is the main docker file for building base image using many scripts to handle patching updates and upgrades and security clean up	
+goss.yaml	it is used in main docker file which is creating the base image uisng for run time container testing by calling test_long_var_with_contenv.sh	It uses [dgoss](https://github.com/aelsabbahy/goss/tree/master/extras/dgoss) validator. To add additional run-time tests, extend `./test.sh` and `./goss.yaml` file
+README.md	this file contain entire information about the base image building testing scanning end to end	
+test.sh	using this script we are running dgoss run time validation for containers by checking To validate 4096 char works correctly	"### Testing
+
+- Container tests itself as part of build process using [goss](https://github.com/aelsabbahy/goss) validator. To add additional build-time tests, overwrite (or extend) the `./container/root/goss.base.yaml` file.
+- To initiate run-time validation, please execute `test.sh`. It uses [dgoss](https://github.com/aelsabbahy/goss/tree/master/extras/dgoss) validator. To add additional run-time tests, extend `./test.sh` and `./goss.yaml` file."
+scripts		
+clean_ubuntu.sh	"using on main docker file for Performs cleanup, ensure unnecessary packages and package lists
+# are safely removed, without triggering Docker AUFS permission bug"	
+install_goss.sh	using in main docker firl RUN /bin/bash -e /scripts/install_goss.sh is used for run-time testing.	curl -fL https://github.com/aelsabbahy/goss/releases/download/${GOSS_VERSION}/goss-linux-amd64 -o /usr/local/bin/goss
+install_s6.sh	"using in main docker Add S6 for zombie reaping, boot-time coordination, signal transformation/distribution
+# @see https://github.com/just-containers/s6-overlay"	
+security_updates_ubuntu.sh	"using in main docker  upgrade just the packages listed as security, without affecting
+# any subsequent usages of apt-get"	
+ubuntu_apt_cleanmode.sh	Using in main docker file RUN /bin/bash -e /scripts/ubuntu_apt_cleanmode.sh	" Set apt package manager to not use cache, not write out docs
+# NOTE: leaving generated locales, copyrights in place
+# @see https://wiki.ubuntu.com/ReducingDiskFootprint#Drop_unnecessary_files"
+with-bigcontenv		
+gos.base.yaml	using in mail docker RUN goss -g goss.base.yaml validate --format documentation to check Use a built-in S6 command to ensure it was installed	
+init.sh	# NOTE: intentionally NOT using s6 init as the entrypoint	
+run.sh	This would prevent container debugging if any of those service crash	
+worker.sh	Used with alternative CMD (worker.sh), leverages supervisor to maintain long-running processes	"ENV SIGNAL_BUILD_STOP=99 \
+    S6_BEHAVIOUR_IF_STAGE2_FAILS=2 \
+    S6_KILL_FINISH_MAXTIME=5000 \
+    S6_KILL_GRACETIME=3000"
+run.d		
+.gitkeep	that make runtime modifications ahead of S6 initialization	
+services.d		
+.gitkeep	services that will be supervised by S6: https://github.com/just-containers/s6-overlay#writing-a-service-script	
+services-available		
+.gitkeep	services that will be supervised by S6: https://github.com/just-containers/s6-overlay#writing-a-service-script	
+fix-attrs.d		
+.gitkeep	scripts that may fix permissions at runtime: https://github.com/just-containers/s6-overlay#fixing-ownership--permissions	
+cont-init.d		
+.gitkeep	startup scripts that run ahead of services booting: https://github.com/just-containers/s6-overlay#executing-initialization-andor-finalization-tasks	
