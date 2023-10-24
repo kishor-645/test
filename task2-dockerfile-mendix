@@ -1,0 +1,113 @@
+name: '$(build.definitionName).$(build.sourceBranchName).$(date:yyyyMMdd).$(build.buildId)'
+
+trigger:
+- none
+
+variables:
+  vmImageName: 'ubuntu-latest'
+  service_connection: "AZR-ringS-ServiceConnection"
+  Container_Registry: "azrterraacr01ss"
+  Docker_Image_Name: "test-img-mendix"
+  branch_path: "build"
+
+
+
+#   Build Mendix App Docker Image with P66 Cert
+stages:
+- stage: Build_Mendix_App
+  displayName: Building Mendix App
+  jobs:
+  - job: build_image
+    displayName: Build & Push Image
+    pool:
+      vmImage: $(vmImageName)
+    steps:
+    - script: |
+          wget https://github.com/mendix/docker-mendix-buildpack/archive/master.zip
+          unzip master
+          mv -f docker-mendix-buildpack-master/* .
+          rm -R  docker-mendix-buildpack-master
+      displayName: 'Download Mendix Docker Build Pack '
+
+    # - task: Docker@0
+    #   displayName: 'Build Docker image for Mendix app'
+    #   inputs:
+    #     azureSubscription: 'AZR-ringS-ServiceConnection'
+    #     azureContainerRegistry: '{"loginServer":"azrterraacr01ss.azurecr.io", "id" : "/subscriptions/53a67c30-fc05-439c-9fde-848723ff5817/resourceGroups/RG-US-K8s-ContainerRegistry/providers/Microsoft.ContainerRegistry/registries/azrterraacr01ss"}'
+    #     buildArguments: |
+    #       ROOTFS_IMAGE=azrterraacr01ss.azurecr.io/base-mendix-prepped:latest
+    #       BUILD_PATH=$(branch_path)
+    #       APPMETRICS_PROMETHEUS=true
+    #       BUILDPACK_XTRACE=true
+    #     imageName: 'azrmendixacr01ss.azurecr.io/$(Docker_Image_Name)'
+    #     qualifyImageName: false
+    #     additionalImageTags: '$(Build.BuildNumber)'
+    #     includeLatestTag: true
+
+    - task: Docker@2
+      inputs:
+        containerRegistry: 'azrterraacr01ss'
+        repository: 'azrterraacr01r1.azurecr.io/$(Docker_Image_Name)'
+        command: 'build'
+        Dockerfile: '$(Build.SourcesDirectory)/Dockerfile'
+        arguments: '--build-arg ROOTFS_IMAGE=azrterraacr01ss.azurecr.io/base-mendix-prepped:latest  --build-arg APPMETRICS_PROMETHEUS=true --build-arg BUILDPACK_XTRACE=true'
+        tags: |
+          $(Build.BuildId)
+          latest
+        
+
+    # - task: Docker@2
+    #   inputs:
+    #     containerRegistry: 'azrterraacr01ss'
+    #     repository: 'azrterraacr01r1.azurecr.io/$(Docker_Image_Name)'
+    #     command: 'build'
+    #     Dockerfile: 'base-mendix/Dockerfile'
+    #     arguments: '--build-arg ROOTFS_IMAGE=azrterraacr01ss.azurecr.io/base-mendix-prepped:latest  --build-arg APPMETRICS_PROMETHEUS=true --build-arg BUILDPACK_XTRACE=true'
+    #     tags: |
+    #       $(Build.BuildId)
+    #       latest
+   
+    - task: Docker@0
+      displayName: 'Push Docker image to Azure Container Registry'
+      inputs:
+        azureSubscription: '$(service_connection)'
+        azureContainerRegistry: '$(Container_Registry)'
+        action: 'Push an image'
+        imageName: 'azrmendixacr01ss.azurecr.io/$(Docker_Image_Name)'
+        qualifyImageName: false
+        additionalImageTags: '$(Build.BuildNumber)'
+        includeLatestTag: true
+
+    - task: Docker@0
+      displayName: 'Run temporary container (for extracting metadata.json)'
+      inputs:
+        azureSubscription: '$(service_connection)'
+        azureContainerRegistry: '$(Container_Registry)'
+        action: 'Run an image'
+        imageName: '$(Docker_Image_Name)'
+        containerName: mendixapp
+        entrypoint: /bin/true
+
+    - task: Docker@0
+      displayName: 'Extract metadata.json from temporary container image'
+      inputs:
+        azureSubscription: '$(service_connection)'
+        azureContainerRegistry: '$(Container_Registry)'
+        action: 'Run a Docker command'
+        customCommand: 'cp mendixapp:/opt/mendix/build/model/metadata.json $(Build.ArtifactStagingDirectory)'
+
+    - task: Docker@0
+      displayName: 'Remove temporary container'
+      inputs:
+        azureSubscription: '$(service_connection)'
+        azureContainerRegistry: '$(Container_Registry)'
+        action: 'Run a Docker command'
+        customCommand: 'rm mendixapp'
+      condition: always()
+
+
+    - task: PublishBuildArtifacts@1
+      displayName: 'Publish Artifact: Docker Image'
+      inputs:
+        PathtoPublish: '$(Build.ArtifactStagingDirectory)/metadata.json'
+        ArtifactName: DockerBuild
