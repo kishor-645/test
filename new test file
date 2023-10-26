@@ -1,0 +1,7 @@
+- task: Docker@2
+  displayName: Run Docker container
+  inputs:
+    command: run
+    containerRegistry: myregistry
+    repository: myregistry/myimage
+    tag: latest
