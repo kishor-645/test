@@ -1,49 +1,26 @@
-name: Build Pre-deps Image
-
+name: cicd-workflow to create docker image and upload into AWS ECR
 on:
-  workflow_dispatch:
-    inputs:
-      branch:
-        description: 'Branch to build from'
-        required: true
-        default: 'main'
-        type: string
-
-env:
-  AWS_REGION: ap-south-1
-  ECR_REPOSITORY: hostimage
-  PREDEPS_IMAGE_TAG: 123
-
+  push:
+    branches: [ "main" ]
 jobs:
-  build-and-push:
+  job1:
     runs-on: ubuntu-latest
-    permissions:
-      id-token: write
-      contents: read
-
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
+    - uses: actions/checkout@v3
+    - name: Setup AWS ECR Details
+      uses: aws-actions/configure-aws-credentials@v1
       with:
-        ref: ${{ inputs.branch }}
-
-    - name: Configure AWS credentials
-      uses: aws-actions/configure-aws-credentials@v4
-      with:
-        role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
-        aws-region: ${{ env.AWS_REGION }}
-
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{secrets.AWS_REGION}}
     - name: Login to Amazon ECR
-      id: login-ecr
-      uses: aws-actions/amazon-ecr-login@v2
-
-    - name: Build and push pre-deps image
-      uses: docker/build-push-action@v5
-      with:
-        context: .
-        file: pre-deps.Dockerfile
-        push: true
-        tags: |
-          ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ env.PREDEPS_IMAGE_TAG }}
-        cache-from: type=gha
-        cache-to: type=gha,mode=max
+      id: login-pf-aws-ecr
+      uses: aws-actions/amazon-ecr-login@v1
+    - name: Build and push Docker image
+      env:
+        ECR_REGISTRY: ${{ steps.login-pf-aws-ecr.outputs.registry }}
+        ECR_REPOSITORY: ${{secrets.REPO_NAME}}
+        IMAGE_TAG: ${{ github.sha }}
+      run: |
+        docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG -f pre-deps.Dockerfile .
+        docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
