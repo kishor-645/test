@@ -1,0 +1,49 @@
+name: Build Pre-deps Image
+
+on:
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: 'Branch to build from'
+        required: true
+        default: 'main'
+        type: string
+
+env:
+  AWS_REGION: ap-south-1
+  ECR_REPOSITORY: hostimage
+  PREDEPS_IMAGE_TAG: 123
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        ref: ${{ inputs.branch }}
+
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+        aws-region: ${{ env.AWS_REGION }}
+
+    - name: Login to Amazon ECR
+      id: login-ecr
+      uses: aws-actions/amazon-ecr-login@v2
+
+    - name: Build and push pre-deps image
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        file: pre-deps.Dockerfile
+        push: true
+        tags: |
+          ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ env.PREDEPS_IMAGE_TAG }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
