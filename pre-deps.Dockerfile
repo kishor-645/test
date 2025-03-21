@@ -1,5 +1,4 @@
 FROM --platform=linux/amd64 php:8.1-fpm-bookworm
-
 WORKDIR /var/www/html
 
 # Install necessary packages
